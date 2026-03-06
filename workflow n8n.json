@@ -1,0 +1,317 @@
+{
+  "name": "parallel_updated",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ccc3da34-3795-4f93-bfb1-5f4af98bfe42",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a9313fc6-7700-42af-9e73-301a7002378e",
+              "name": "questions",
+              "value": "[\"what is 50*75\",\"what is chennai weather\"]",
+              "type": "array"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "252105f1-8183-4552-92e0-3bb7122e1f0b",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "questions",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "82dc40fe-c062-4e90-abf7-83de686b5ab1",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f5588a81-d044-437b-93e2-f4a8c5483234",
+              "name": "prompt",
+              "value": "={{ $json.questions }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        0
+      ],
+      "id": "eef9f028-dcd7-41e9-be8b-a21d0f216133",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3ffa6894-5268-4630-a43d-575ec47637df",
+              "leftValue": "={{ $json.prompt }}",
+              "rightValue": "*",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "284092bd-337c-4bf3-8d12-014df824be86",
+              "leftValue": "={{ $json.prompt }}",
+              "rightValue": "+",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "9c583170-b121-43cd-abc1-ce49b5c18116",
+              "leftValue": "={{$json.prompt }}",
+              "rightValue": "-",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "bdbc6fb9-220f-4704-bb32-b118cd1c6f67",
+              "leftValue": "={{ $json.prompt }}",
+              "rightValue": "/",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        832,
+        0
+      ],
+      "id": "90406896-6ac7-48d5-a0ff-5d4ba32c85a6",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const q = $json.prompt;\nconst expression = q.match(/[0-9+\\-*/.]+/)[0];\n\nconst result = eval(expression);\n\nreturn [{ \n  question: q,\n  tool: \"calculator\",\n  result\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -32
+      ],
+      "id": "467b4b4e-5d72-4590-839e-83c5f657ec94",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer your API key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"{{$json.prompt}}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1040,
+        96
+      ],
+      "id": "356df477-2014-4d5a-8a42-d897de748d53",
+      "name": "HTTP Request",
+      "onError": "continueRegularOutput",
+      "notes": "Error getting answer"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1248,
+        -32
+      ],
+      "id": "d6ab89ef-824c-4612-a7a3-85eb9ae08737",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const answer = $json.choices?.[0]?.message?.content || \"Error getting answer\";\nconst tool = $json.choices?.[0]?.message?.role\n\nreturn [{\n  question: $json.prompt,\n  result: answer,\n  tool: tool\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        96
+      ],
+      "id": "d0a8d7ac-f5d9-4e33-bcf1-d4b78636da36",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6dfe653e-2108-4e34-8fe8-7d5d2aca02cc",
+  "meta": {
+    "instanceId": "45e9bae2be4f776d3b62807dfc130ea578fe834da833b072ab60486509bd234d"
+  },
+  "id": "FPdpfDKoIQczIIvL",
+  "tags": []
+}
