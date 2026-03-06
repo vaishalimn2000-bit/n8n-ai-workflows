@@ -1,0 +1,281 @@
+{
+  "name": "React agent loop 2",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        96
+      ],
+      "id": "0a3ffa9b-055b-4c5d-96da-f9bab1715091",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "813ff1dd-6061-4739-9a04-227e90b6314c",
+              "name": "question",
+              "value": "what is 45*30",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -112,
+        96
+      ],
+      "id": "768568f6-f9ac-4527-9109-8fbfd6240946",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6ab74d39-b744-4052-92ff-c7d609bb4f1b",
+              "name": "prompt",
+              "value": "=You are a ReAct agent.\n\nQuestion: {{$json.question}}\n\nYou MUST use this format exactly:\n\nThought: think step by step\nAction: calculator\nAction Input: the math expression\nObservation:\nFinal Answer:\n\nRules:\n- Action must be either calculator or none\n- If the question contains math, Action MUST be calculator",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        64,
+        96
+      ],
+      "id": "f744ce8c-e044-439d-a46c-ff778e493f39",
+      "name": "Create prompt"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b58cfbb6-16c3-486b-9df8-b61117b5e368",
+              "leftValue": "={{$json.action}}",
+              "rightValue": "calculator",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        608,
+        96
+      ],
+      "id": "40af0560-1b2d-45f6-8550-4568ce3a5d49",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer Your API key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"openai/gpt-oss-120b\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a ReAct agent.\\n\\nQuestion: what is 45*30\\n\\nThought: think step by step\\nAction: calculator or none\\nAction Input: math expression\\nObservation:\\n\\nIf you know the answer:\\nFinal Answer: answer\\n\\nRules: Action must be either \\\"calculator\\\" or \\\"none\\\"\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        256,
+        64
+      ],
+      "id": "fee5c6b0-0173-4f2a-bca9-ddcc6adf0f96",
+      "name": "LLMreasoning"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst text = $json.choices?.[0]?.message?.content || \"\";\n\nconst actionMatch = text.match(/Action:\\s*(.*)/);\nconst inputMatch = text.match(/Action Input:\\s*(.*)/);\nconst finalMatch = text.match(/Final Answer:\\s*(.*)/);\n\nreturn [{\n  action: actionMatch ? actionMatch[1].trim() : null,\n  input: inputMatch ? inputMatch[1].trim() : null,\n  final: finalMatch ? finalMatch[1].trim() : null,\n  raw: text\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        96
+      ],
+      "id": "273fff8d-daa3-4299-9409-ecc9b7d029c8",
+      "name": "Parse action"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nlet expression = $json.input || \"\";\n\n// remove symbols like = or ?\nexpression = expression.replace(\"=\", \"\").replace(\"?\", \"\").trim();\n\nconst result = eval(expression);\n\nreturn [{\n  observation: result\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        16
+      ],
+      "id": "268576ae-0ad6-43ff-b843-a0d05dc8530a",
+      "name": "Calculator"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "234e97e7-331d-48f5-84d3-7f67ab03267d",
+              "name": "Observation",
+              "value": "={{$json.observation}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        976,
+        16
+      ],
+      "id": "dc26bb05-fdf1-4768-bb83-87158dbede1e",
+      "name": "Observation"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Create prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create prompt": {
+      "main": [
+        [
+          {
+            "node": "LLMreasoning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Calculator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "LLMreasoning": {
+      "main": [
+        [
+          {
+            "node": "Parse action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse action": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculator": {
+      "main": [
+        [
+          {
+            "node": "Observation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Observation": {
+      "main": [
+        [
+          {
+            "node": "LLMreasoning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "71238da8-512b-4256-8106-faade001c4cc",
+  "meta": {
+    "instanceId": "45e9bae2be4f776d3b62807dfc130ea578fe834da833b072ab60486509bd234d"
+  },
+  "id": "hg229TKgSWF9K7JE",
+  "tags": []
+}
